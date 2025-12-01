@@ -35,6 +35,9 @@ cat > env.json <<EOF
   "GetPollFunction": {
     "POLLS_TABLE": "movie-vote-polls-local"
   },
+  "GetPollStatsFunction": {
+    "POLLS_TABLE": "movie-vote-polls-local"
+  },
   "UpdatePollPhaseFunction": {
     "POLLS_TABLE": "movie-vote-polls-local"
   },

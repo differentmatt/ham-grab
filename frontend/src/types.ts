@@ -35,6 +35,7 @@ export interface CreatePollResponse {
   title: string;
   pollType: 'movie' | 'other';
   phase: string;
+  dailyPollCount?: number;
 }
 
 export interface RCVRound {

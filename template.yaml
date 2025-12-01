@@ -213,6 +213,22 @@ Resources:
         - DynamoDBCrudPolicy:
             TableName: !Ref PollsTable
 
+  GetPollStatsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: backend/
+      Handler: handlers/polls.getStats
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /polls/stats
+            Method: GET
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref PollsTable
+
   UpdatePollPhaseFunction:
     Type: AWS::Serverless::Function
     Properties:

@@ -20,6 +20,9 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export const api = {
+  getStats: (): Promise<{ dailyPollCount: number; dailyLimit: number; date: string }> =>
+    request('/polls/stats'),
+
   createPoll: (title: string, pollType: 'movie' | 'other'): Promise<CreatePollResponse> =>
     request('/polls', {
       method: 'POST',

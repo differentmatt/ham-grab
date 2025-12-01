@@ -3,6 +3,60 @@ import { nanoid } from 'nanoid';
 import { docClient, TABLE_NAME, getTTL } from '../lib/dynamo.js';
 import { success, created, badRequest, notFound, forbidden, serverError } from '../lib/response.js';
 
+const DAILY_POLL_LIMIT = 1000;
+
+// Helper to get today's date in YYYY-MM-DD format
+const getTodayDateKey = () => {
+  const now = new Date();
+  return now.toISOString().split('T')[0];
+};
+
+// Helper to check and increment daily poll counter
+const checkAndIncrementDailyCounter = async () => {
+  const today = getTodayDateKey();
+
+  try {
+    // Atomically increment the counter
+    const result = await docClient.send(new UpdateCommand({
+      TableName: TABLE_NAME,
+      Key: { PK: 'COUNTER', SK: `DAILY#${today}` },
+      UpdateExpression: 'ADD #count :inc',
+      ExpressionAttributeNames: {
+        '#count': 'count',
+      },
+      ExpressionAttributeValues: {
+        ':inc': 1,
+      },
+      ReturnValues: 'ALL_NEW',
+    }));
+
+    const newCount = result.Attributes?.count || 0;
+
+    // Check if we exceeded the limit
+    if (newCount > DAILY_POLL_LIMIT) {
+      // Decrement back since we exceeded
+      await docClient.send(new UpdateCommand({
+        TableName: TABLE_NAME,
+        Key: { PK: 'COUNTER', SK: `DAILY#${today}` },
+        UpdateExpression: 'ADD #count :dec',
+        ExpressionAttributeNames: {
+          '#count': 'count',
+        },
+        ExpressionAttributeValues: {
+          ':dec': -1,
+        },
+      }));
+
+      return { exceeded: true, count: newCount - 1 };
+    }
+
+    return { exceeded: false, count: newCount };
+  } catch (error) {
+    console.error('Error checking daily counter:', error);
+    throw error;
+  }
+};
+
 // POST /polls - Create a new poll
 export const create = async (event) => {
   try {
@@ -15,6 +69,24 @@ export const create = async (event) => {
 
     if (!pollType || !['movie', 'other'].includes(pollType)) {
       return badRequest('Invalid poll type');
+    }
+
+    // Check daily rate limit
+    const { exceeded, count } = await checkAndIncrementDailyCounter();
+
+    if (exceeded) {
+      return {
+        statusCode: 429,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        },
+        body: JSON.stringify({
+          error: 'Daily poll creation limit reached. Please try again tomorrow.',
+          dailyLimit: DAILY_POLL_LIMIT,
+          currentCount: count,
+        }),
+      };
     }
 
     const pollId = nanoid(10);
@@ -43,6 +115,7 @@ export const create = async (event) => {
       title: poll.title,
       pollType: poll.pollType,
       phase: poll.phase,
+      dailyPollCount: count,
     });
   } catch (error) {
     return serverError(error);
@@ -108,6 +181,28 @@ export const get = async (event) => {
     }
 
     return success(response);
+  } catch (error) {
+    return serverError(error);
+  }
+};
+
+// GET /polls/stats - Get daily poll creation stats
+export const getStats = async () => {
+  try {
+    const today = getTodayDateKey();
+
+    const result = await docClient.send(new GetCommand({
+      TableName: TABLE_NAME,
+      Key: { PK: 'COUNTER', SK: `DAILY#${today}` },
+    }));
+
+    const count = result.Item?.count || 0;
+
+    return success({
+      dailyPollCount: count,
+      dailyLimit: DAILY_POLL_LIMIT,
+      date: today,
+    });
   } catch (error) {
     return serverError(error);
   }

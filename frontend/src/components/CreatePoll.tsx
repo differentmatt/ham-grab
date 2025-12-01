@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { addPollToHistory } from '../storage';
@@ -9,7 +9,17 @@ export function CreatePoll() {
   const [pollType, setPollType] = useState<'movie' | 'other'>('movie');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [dailyPollCount, setDailyPollCount] = useState<number | null>(null);
   const navigate = useNavigate();
+
+  // Fetch daily poll stats on mount
+  useEffect(() => {
+    api.getStats().then(stats => {
+      setDailyPollCount(stats.dailyPollCount);
+    }).catch(() => {
+      // Silently fail - counter is not critical
+    });
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -109,6 +119,12 @@ export function CreatePoll() {
           >
             {loading ? 'Creating...' : 'Create Poll'}
           </button>
+
+          {dailyPollCount !== null && (
+            <p className="mt-2 text-xs text-muted text-center">
+              {dailyPollCount} {dailyPollCount === 1 ? 'poll' : 'polls'} created today (1,000 limit)
+            </p>
+          )}
         </form>
       </div>
 
