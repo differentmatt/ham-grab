@@ -1,0 +1,19 @@
+{
+  "name": "ham-grab-backend",
+  "version": "1.0.0",
+  "description": "Ham Grab API - Ranked choice voting for movies",
+  "type": "module",
+  "scripts": {
+    "test": "vitest",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.71.0",
+    "@aws-sdk/client-dynamodb": "^3.450.0",
+    "@aws-sdk/lib-dynamodb": "^3.450.0",
+    "nanoid": "^5.0.4"
+  },
+  "devDependencies": {
+    "vitest": "^1.0.0"
+  }
+}

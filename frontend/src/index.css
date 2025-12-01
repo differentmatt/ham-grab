@@ -1,0 +1,43 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Main backgrounds - Edit these colors easily! */
+    --color-bg: #EDAD4A;           /* Body - golden orange */
+    --color-card: #FFF8F0;         /* Cards/sections - warm cream (pops!) */
+    --color-input: #ffffff;        /* Inputs - white */
+    --color-surface: #FFFAF5;      /* Lighter surface - barely off white */
+
+    /* Text colors */
+    --color-text: #3d2817;         /* Main text - deep chocolate brown */
+    --color-text-muted: #6b4423;   /* Secondary text - rich brown */
+    --color-text-light: #8b5a2b;   /* Tertiary text - medium brown */
+
+    /* Borders */
+    --color-border: #c17a3f;       /* Brown-orange borders */
+
+    /* Accent colors */
+    --color-primary: #f97316;      /* Primary button - orange */
+    --color-primary-hover: #ea580c;
+    --color-success: #059669;      /* Success/voting - emerald */
+    --color-success-hover: #047857;
+    --color-warning: #d97706;      /* Warning/results - amber */
+    --color-warning-hover: #b45309;
+  }
+}
+
+body {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  min-height: 100vh;
+}
+
+.dragging {
+  @apply opacity-50;
+}
+
+.drag-over {
+  background-color: rgba(249, 115, 22, 0.2);
+}

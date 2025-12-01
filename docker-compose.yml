@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  dynamodb-local:
+    image: amazon/dynamodb-local:latest
+    container_name: movie-vote-dynamodb
+    ports:
+      - "8000:8000"
+    command: "-jar DynamoDBLocal.jar -sharedDb -inMemory"
+    networks:
+      - movie-vote-network
+
+networks:
+  movie-vote-network:
+    driver: bridge
+
+volumes:
+  dynamodb-data:
