@@ -10,12 +10,14 @@ export function CreatePoll() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [dailyPollCount, setDailyPollCount] = useState<number | null>(null);
+  const [dailyLimit, setDailyLimit] = useState<number | null>(null);
   const navigate = useNavigate();
 
   // Fetch daily poll stats on mount
   useEffect(() => {
     api.getStats().then(stats => {
       setDailyPollCount(stats.dailyPollCount);
+      setDailyLimit(stats.dailyLimit);
     }).catch(() => {
       // Silently fail - counter is not critical
     });
@@ -120,9 +122,9 @@ export function CreatePoll() {
             {loading ? 'Creating...' : 'Create Poll'}
           </button>
 
-          {dailyPollCount !== null && (
+          {dailyPollCount !== null && dailyLimit !== null && (
             <p className="mt-2 text-xs text-muted text-center">
-              {dailyPollCount} {dailyPollCount === 1 ? 'poll' : 'polls'} created today (1,000 limit)
+              {dailyPollCount} {dailyPollCount === 1 ? 'poll' : 'polls'} created today ({dailyLimit.toLocaleString()} limit)
             </p>
           )}
         </form>
