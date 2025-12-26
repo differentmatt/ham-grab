@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
 import { api } from '../api';
 import type { Poll } from '../types';
@@ -19,9 +19,10 @@ export function PollPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [voted, setVoted] = useState(false);
+  const pollDataRef = useRef<string | null>(null);
 
   const fetchPoll = useCallback(async () => {
-    if (!pollId) return;
+    if (!pollId) return null;
     try {
       const data = await api.getPoll(pollId, adminToken);
       setPoll(data);
@@ -35,17 +36,104 @@ export function PollPage() {
         adminToken: data.isAdmin ? adminToken : undefined,
         lastVisited: Date.now(),
       });
+
+      // Return serialized data for change detection
+      return JSON.stringify(data);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load poll');
+      return null;
     } finally {
       setLoading(false);
     }
   }, [pollId, adminToken]);
 
   useEffect(() => {
-    fetchPoll();
-    const interval = setInterval(fetchPoll, 3000);
-    return () => clearInterval(interval);
+    const MIN_INTERVAL = 3000; // 3 seconds
+    const MAX_INTERVAL = 30000; // 30 seconds
+    const BACKOFF_MULTIPLIER = 1.5;
+
+    let currentInterval = MIN_INTERVAL;
+    let timeoutId: number;
+    let isVisible = document.visibilityState === 'visible';
+
+    const scheduleNextPoll = () => {
+      if (!isVisible) {
+        console.log('[Polling] Skipping poll - tab hidden');
+        return; // Don't schedule if tab is hidden
+      }
+
+      console.log(`[Polling] Scheduling next poll in ${currentInterval}ms`);
+      timeoutId = window.setTimeout(async () => {
+        // Double-check visibility when timeout fires (in case tab was hidden after scheduling)
+        // Must check document.visibilityState directly, not the closure variable
+        if (document.visibilityState !== 'visible') {
+          console.log('[Polling] Skipping scheduled poll - tab is now hidden');
+          return;
+        }
+
+        console.log('[Polling] Fetching poll data...');
+        const prevData = pollDataRef.current;
+        const currentData = await fetchPoll();
+
+        if (currentData) {
+          // Check if poll data changed (detect activity)
+          const hasChanged = prevData && prevData !== currentData;
+
+          if (hasChanged) {
+            // Reset to fast polling on activity
+            console.log('[Polling] Activity detected - resetting to fast polling');
+            currentInterval = MIN_INTERVAL;
+          } else {
+            // Increase interval with exponential backoff
+            const oldInterval = currentInterval;
+            currentInterval = Math.min(currentInterval * BACKOFF_MULTIPLIER, MAX_INTERVAL);
+            console.log(`[Polling] No activity - backing off from ${oldInterval}ms to ${currentInterval}ms`);
+          }
+
+          pollDataRef.current = currentData;
+        }
+
+        scheduleNextPoll();
+      }, currentInterval);
+    };
+
+    const handleVisibilityChange = () => {
+      const wasVisible = isVisible;
+      isVisible = document.visibilityState === 'visible';
+
+      console.log(`[Polling] Visibility changed: ${document.visibilityState} (was ${wasVisible ? 'visible' : 'hidden'}, now ${isVisible ? 'visible' : 'hidden'})`);
+
+      if (isVisible && !wasVisible) {
+        // Tab became visible - reset to fast polling and fetch immediately
+        console.log('[Polling] Tab became visible - resuming polling');
+        currentInterval = MIN_INTERVAL;
+        clearTimeout(timeoutId);
+        fetchPoll().then((data) => {
+          if (data) pollDataRef.current = data;
+          scheduleNextPoll();
+        });
+      } else if (!isVisible && wasVisible) {
+        // Tab hidden - stop polling
+        console.log('[Polling] Tab hidden - stopping polling');
+        clearTimeout(timeoutId);
+      }
+    };
+
+    // Initial fetch
+    console.log('[Polling] Starting polling system');
+    fetchPoll().then((data) => {
+      if (data) pollDataRef.current = data;
+      scheduleNextPoll();
+    });
+
+    // Listen for visibility changes
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      console.log('[Polling] Cleanup - stopping polling');
+      clearTimeout(timeoutId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, [fetchPoll]);
 
   if (loading) {
