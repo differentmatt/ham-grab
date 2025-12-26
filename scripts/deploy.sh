@@ -9,7 +9,7 @@ if [ -f .env ]; then
   export $(cat .env | grep -v '^#' | xargs)
 fi
 
-echo "🚀 Deploying Movie Vote ($STAGE)"
+echo "🚀 Deploying Ham Grab to ${STAGE^^} environment"
 
 # Build and deploy SAM stack
 echo "📦 Building SAM application..."
@@ -62,12 +62,12 @@ aws cloudfront create-invalidation \
   --paths "/*" > /dev/null
 
 echo ""
-echo "✅ Deployment complete!"
+echo "✅ Deployment complete! (${STAGE^^} environment)"
 if [ "$STAGE" = "prod" ]; then
-  echo "🌐 Frontend: https://hamgrab.com"
-  echo "🌐 Frontend (CloudFront): $FRONTEND_URL"
+  echo "🌐 Production URL: https://hamgrab.com"
+  echo "🌐 CloudFront URL: $FRONTEND_URL"
 else
-  echo "🌐 Frontend: $FRONTEND_URL"
+  echo "🌐 Dev URL: $FRONTEND_URL"
 fi
 echo ""
 echo "Note: CloudFront may take a few minutes to propagate globally."
