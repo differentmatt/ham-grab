@@ -1,6 +1,6 @@
 import { GetCommand, PutCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { nanoid } from 'nanoid';
-import { docClient, TABLE_NAME, getTTL } from '../lib/dynamo.js';
+import { docClient, TABLE_NAME } from '../lib/dynamo.js';
 import { success, created, badRequest, notFound, forbidden, serverError } from '../lib/response.js';
 
 const DAILY_POLL_LIMIT = 1000;
@@ -101,7 +101,6 @@ export const create = async (event) => {
       pollType,
       phase: 'nominating',
       createdAt: Date.now(),
-      TTL: getTTL(),
     };
 
     await docClient.send(new PutCommand({

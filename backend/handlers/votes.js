@@ -1,6 +1,6 @@
 import { GetCommand, PutCommand, DeleteCommand, QueryCommand } from '@aws-sdk/lib-dynamodb';
 import { nanoid } from 'nanoid';
-import { docClient, TABLE_NAME, getTTL } from '../lib/dynamo.js';
+import { docClient, TABLE_NAME } from '../lib/dynamo.js';
 import { success, created, badRequest, notFound, serverError } from '../lib/response.js';
 
 // POST /polls/{pollId}/votes - Submit or update a vote
@@ -87,7 +87,6 @@ export const submit = async (event) => {
       nickname: nickname.trim(),
       rankings: validRankings,
       submittedAt: Date.now(),
-      TTL: getTTL(),
     };
 
     await docClient.send(new PutCommand({

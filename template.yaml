@@ -60,9 +60,6 @@ Resources:
           KeyType: HASH
         - AttributeName: SK
           KeyType: RANGE
-      TimeToLiveSpecification:
-        AttributeName: TTL
-        Enabled: true
 
   # ============ API ============
   ApiGateway:
