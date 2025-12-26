@@ -60,17 +60,24 @@ function formatDate(timestamp: number): string {
   const isToday = date.toDateString() === now.toDateString();
 
   if (isToday) {
-    // Show time if today
-    return date.toLocaleTimeString(undefined, {
+    // Show "Today at 3:45 PM"
+    return `Today at ${date.toLocaleTimeString(undefined, {
       hour: 'numeric',
       minute: '2-digit'
-    });
+    })}`;
   }
 
-  // Show date for older entries
-  return date.toLocaleDateString(undefined, {
+  // Show date and time for older entries (e.g., "Dec 25 at 3:45 PM" or "Dec 25, 2024 at 3:45 PM")
+  const dateStr = date.toLocaleDateString(undefined, {
     month: 'short',
     day: 'numeric',
     year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
   });
+
+  const timeStr = date.toLocaleTimeString(undefined, {
+    hour: 'numeric',
+    minute: '2-digit'
+  });
+
+  return `${dateStr} at ${timeStr}`;
 }
