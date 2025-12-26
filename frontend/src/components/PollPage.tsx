@@ -150,7 +150,7 @@ export function PollPage() {
               then the admin will start voting when ready.
             </p>
           </div>
-          <AddMovie pollId={pollId} pollType={poll.pollType} onAdded={fetchPoll} />
+          <AddMovie pollId={pollId} pollType={poll.pollType} movieCount={poll.movies.length} onAdded={fetchPoll} />
           <div className="bg-card rounded-xl p-4 sm:p-6">
             <h2 className="text-sm font-medium text-muted mb-4">
               {itemLabel} ({poll.movies.length})

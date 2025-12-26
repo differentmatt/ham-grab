@@ -115,6 +115,12 @@ export const add = async (event) => {
       return badRequest(`"${existingMovie.title}" has already been added`);
     }
 
+    // Check if poll already has 20 entries
+    const movieCount = moviesResult.Items?.length || 0;
+    if (movieCount >= 20) {
+      return badRequest('Poll already has the maximum of 20 entries');
+    }
+
     const movieId = nanoid(10);
     const addedAt = Date.now();
 

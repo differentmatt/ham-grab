@@ -54,8 +54,9 @@ cat > env.json <<EOF
 }
 EOF
 
-# Start DynamoDB Local
+# Start DynamoDB Local (cleanup any existing stopped containers first)
 echo "🗄️  Starting DynamoDB Local..."
+docker-compose down 2>/dev/null
 docker-compose up -d
 
 # Wait for DynamoDB to be ready
