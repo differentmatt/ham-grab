@@ -151,7 +151,7 @@ export function VotingInterface({ poll, pollId, onVoted }: VotingInterfaceProps)
           value={nickname}
           onChange={(e) => setNickname(e.target.value)}
           placeholder="Enter your name"
-          className="w-full px-4 py-3 bg-surface border border-border rounded-lg text-white placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary"
+          className="w-full px-4 py-3 bg-input border border-border rounded-lg text placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary"
         />
       </div>
 

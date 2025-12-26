@@ -35,7 +35,7 @@ export function ShareLinks({ pollId, adminToken }: ShareLinksProps) {
             />
             <button
               onClick={() => copy(voterLink, 'voter')}
-              className="flex-shrink-0 px-3 py-2 bg-surface hover:bg-card text-white text-sm rounded-lg transition-colors"
+              className="flex-shrink-0 px-3 py-2 bg-surface hover:bg-card text text-sm rounded-lg transition-colors"
             >
               {copied === 'voter' ? 'Copied!' : 'Copy'}
             </button>
@@ -54,7 +54,7 @@ export function ShareLinks({ pollId, adminToken }: ShareLinksProps) {
             />
             <button
               onClick={() => copy(adminLink, 'admin')}
-              className="flex-shrink-0 px-3 py-2 bg-surface hover:bg-card text-white text-sm rounded-lg transition-colors"
+              className="flex-shrink-0 px-3 py-2 bg-surface hover:bg-card text text-sm rounded-lg transition-colors"
             >
               {copied === 'admin' ? 'Copied!' : 'Copy'}
             </button>

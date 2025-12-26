@@ -101,7 +101,7 @@ export function Results({ poll }: ResultsProps) {
                         <div className="flex justify-between text-sm mb-1">
                           <span
                             className={`truncate ${
-                              isWinner ? 'text-yellow-400' : 'text-white'
+                              isWinner ? 'text-yellow-400' : 'text'
                             }`}
                           >
                             {movie?.title}
@@ -144,7 +144,7 @@ export function Results({ poll }: ResultsProps) {
           <div className="space-y-2">
             {poll.votes.map((vote) => (
               <div key={vote.voteId} className="bg-card rounded-xl p-4">
-                <div className="text-white font-medium mb-1">
+                <div className="text font-medium mb-1">
                   {vote.nickname}
                 </div>
                 <div className="text-muted text-sm">
