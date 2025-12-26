@@ -9,7 +9,8 @@ if [ -f .env ]; then
   export $(cat .env | grep -v '^#' | xargs)
 fi
 
-echo "🚀 Deploying Ham Grab to ${STAGE^^} environment"
+STAGE_UPPER=$(echo "$STAGE" | tr '[:lower:]' '[:upper:]')
+echo "🚀 Deploying Ham Grab to $STAGE_UPPER environment"
 
 # Build and deploy SAM stack
 echo "📦 Building SAM application..."
@@ -62,7 +63,7 @@ aws cloudfront create-invalidation \
   --paths "/*" > /dev/null
 
 echo ""
-echo "✅ Deployment complete! (${STAGE^^} environment)"
+echo "✅ Deployment complete! ($STAGE_UPPER environment)"
 if [ "$STAGE" = "prod" ]; then
   echo "🌐 Production URL: https://hamgrab.com"
   echo "🌐 CloudFront URL: $FRONTEND_URL"
