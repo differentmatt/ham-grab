@@ -3,7 +3,7 @@ import { nanoid } from 'nanoid';
 import { docClient, TABLE_NAME } from '../lib/dynamo.js';
 import { success, created, badRequest, notFound, forbidden, serverError } from '../lib/response.js';
 
-const DAILY_POLL_LIMIT = 1000;
+const DAILY_POLL_LIMIT = 50;
 
 // Helper to get today's date in YYYY-MM-DD format
 const getTodayDateKey = () => {
@@ -57,6 +57,24 @@ const checkAndIncrementDailyCounter = async () => {
   }
 };
 
+// Helper to check for inappropriate content
+const containsInappropriateContent = (text) => {
+  const blockedPatterns = [
+    /xhamster/i,
+    /xvideos/i,
+    /pornhub/i,
+    /xnxx/i,
+    /redtube/i,
+    /youporn/i,
+    /\bporn\b/i,
+    /\bxxx\b/i,
+    /\bsex\b/i,
+    /\badult\b/i,
+  ];
+
+  return blockedPatterns.some(pattern => pattern.test(text));
+};
+
 // POST /polls - Create a new poll
 export const create = async (event) => {
   try {
@@ -69,6 +87,11 @@ export const create = async (event) => {
 
     if (!pollType || !['movie', 'other'].includes(pollType)) {
       return badRequest('Invalid poll type');
+    }
+
+    // Check for inappropriate content
+    if (containsInappropriateContent(title)) {
+      return badRequest('Poll title contains inappropriate content');
     }
 
     // Check daily rate limit
