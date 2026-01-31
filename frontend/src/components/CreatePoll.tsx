@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { addPollToHistory } from '../storage';
@@ -12,19 +12,7 @@ export function CreatePoll() {
   const [votingMethod, setVotingMethod] = useState<VotingMethod>('borda');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [dailyPollCount, setDailyPollCount] = useState<number | null>(null);
-  const [dailyLimit, setDailyLimit] = useState<number | null>(null);
   const navigate = useNavigate();
-
-  // Fetch daily poll stats on mount
-  useEffect(() => {
-    api.getStats().then(stats => {
-      setDailyPollCount(stats.dailyPollCount);
-      setDailyLimit(stats.dailyLimit);
-    }).catch(() => {
-      // Silently fail - counter is not critical
-    });
-  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,7 +48,7 @@ export function CreatePoll() {
             className="w-full max-w-sm mx-auto rounded-xl shadow-2xl mb-4"
           />
           <p className="text-muted">
-            Create a ranked choice voting poll
+            Create a ranked voting poll for group decisions
           </p>
         </div>
 
@@ -151,12 +139,6 @@ export function CreatePoll() {
           >
             {loading ? 'Creating...' : 'Create Poll'}
           </button>
-
-          {dailyPollCount !== null && dailyLimit !== null && (
-            <p className="mt-2 text-xs text-muted text-center">
-              {dailyPollCount} {dailyPollCount === 1 ? 'poll' : 'polls'} created today ({dailyLimit.toLocaleString()} limit)
-            </p>
-          )}
         </form>
       </div>
 
