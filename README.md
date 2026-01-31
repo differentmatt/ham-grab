@@ -1,14 +1,15 @@
 # Ham Grab
 
-A ranked choice voting app for group decisions. No login required.
+A ranked voting app for group decisions. No login required.
 
 Live at: **https://hamgrab.com**
 
 ## Features
 
 - **Create polls** with shareable links (choose movie-specific or general poll types)
+- **Three voting methods**: Borda Count (default), Condorcet, or Ranked Choice (IRV)
 - **Two-phase voting**: nomination → voting
-- **Ranked choice voting** with instant runoff (supports partial rankings)
+- **Compare methods**: Results page lets you see how different algorithms would rank the same votes
 - **Movie descriptions** automatically fetched for movie polls (powered by Claude API)
 - **Mobile-friendly** responsive design with drag-and-drop
 - **No authentication** required - just share a link
@@ -27,7 +28,10 @@ Live at: **https://hamgrab.com**
 │   └── src/
 │       ├── components/ # UI components
 │       ├── api.ts      # API client
-│       ├── rcv.ts      # Ranked choice voting algorithm
+│       ├── borda.ts    # Borda Count algorithm
+│       ├── condorcet.ts # Condorcet algorithm
+│       ├── rcv.ts      # Ranked Choice (IRV) algorithm
+│       ├── voting.ts   # Unified voting interface
 │       └── types.ts    # TypeScript types
 ├── backend/            # AWS Lambda functions
 │   ├── handlers/       # API handlers
