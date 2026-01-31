@@ -75,11 +75,13 @@ const containsInappropriateContent = (text) => {
   return blockedPatterns.some(pattern => pattern.test(text));
 };
 
+const VALID_VOTING_METHODS = ['borda', 'condorcet', 'rcv'];
+
 // POST /polls - Create a new poll
 export const create = async (event) => {
   try {
     const body = JSON.parse(event.body || '{}');
-    const { title, pollType } = body;
+    const { title, pollType, votingMethod } = body;
 
     if (!title?.trim()) {
       return badRequest('Title is required');
@@ -87,6 +89,12 @@ export const create = async (event) => {
 
     if (!pollType || !['movie', 'other'].includes(pollType)) {
       return badRequest('Invalid poll type');
+    }
+
+    // Validate voting method (default to 'borda' for new polls)
+    const method = votingMethod || 'borda';
+    if (!VALID_VOTING_METHODS.includes(method)) {
+      return badRequest('Invalid voting method');
     }
 
     // Check for inappropriate content
@@ -122,6 +130,7 @@ export const create = async (event) => {
       adminToken,
       title: title.trim(),
       pollType,
+      votingMethod: method,
       phase: 'nominating',
       createdAt: Date.now(),
     };
@@ -136,6 +145,7 @@ export const create = async (event) => {
       adminToken,
       title: poll.title,
       pollType: poll.pollType,
+      votingMethod: poll.votingMethod,
       phase: poll.phase,
       dailyPollCount: count,
     });
@@ -185,6 +195,7 @@ export const get = async (event) => {
       pollId: metadata.pollId,
       title: metadata.title,
       pollType: metadata.pollType || 'movie', // Default to 'movie' for backward compatibility
+      votingMethod: metadata.votingMethod || 'rcv', // Default to 'rcv' for existing polls
       phase: metadata.phase,
       createdAt: metadata.createdAt,
       movies,

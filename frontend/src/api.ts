@@ -1,4 +1,4 @@
-import type { Poll, CreatePollResponse, Movie, Vote } from './types';
+import type { Poll, CreatePollResponse, Movie, Vote, VotingMethod } from './types';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
@@ -23,10 +23,14 @@ export const api = {
   getStats: (): Promise<{ dailyPollCount: number; dailyLimit: number; date: string }> =>
     request('/polls/stats'),
 
-  createPoll: (title: string, pollType: 'movie' | 'other'): Promise<CreatePollResponse> =>
+  createPoll: (
+    title: string,
+    pollType: 'movie' | 'other',
+    votingMethod: VotingMethod = 'borda'
+  ): Promise<CreatePollResponse> =>
     request('/polls', {
       method: 'POST',
-      body: JSON.stringify({ title, pollType }),
+      body: JSON.stringify({ title, pollType, votingMethod }),
     }),
 
   getPoll: (pollId: string, adminToken?: string): Promise<Poll> => {

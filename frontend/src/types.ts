@@ -1,3 +1,5 @@
+export type VotingMethod = 'borda' | 'condorcet' | 'rcv';
+
 export interface Movie {
   movieId: string;
   title: string;
@@ -20,6 +22,7 @@ export interface Poll {
   pollId: string;
   title: string;
   pollType: 'movie' | 'other';
+  votingMethod: VotingMethod;
   phase: 'nominating' | 'voting' | 'closed';
   createdAt: number;
   movies: Movie[];
@@ -34,6 +37,7 @@ export interface CreatePollResponse {
   adminToken: string;
   title: string;
   pollType: 'movie' | 'other';
+  votingMethod: VotingMethod;
   phase: string;
   dailyPollCount?: number;
 }
@@ -49,4 +53,26 @@ export interface RCVResult {
   winner: string | null;
   rounds: RCVRound[];
   totalVotes: number;
+}
+
+export interface BordaResult {
+  winner: string | null;
+  scores: Record<string, number>;
+  totalVotes: number;
+  maxPossibleScore: number;
+  tieBreaker?: 'head-to-head' | 'coin-flip';
+}
+
+export interface CondorcetRanking {
+  candidateId: string;
+  wins: number;
+  losses: number;
+}
+
+export interface CondorcetResult {
+  winner: string | null;
+  rankings: CondorcetRanking[];
+  totalVotes: number;
+  noCondorcetWinner: boolean;
+  tieBreaker?: 'head-to-head' | 'coin-flip';
 }

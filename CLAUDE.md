@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Ham Grab is a ranked choice voting app for group decisions with no authentication required. Users create polls (movie-specific or general), share links, and vote using instant runoff ranked choice voting. The app is serverless, deployed on AWS with a React frontend.
+Ham Grab is a ranked voting app for group decisions with no authentication required. Users create polls (movie-specific or general), share links, and vote using their choice of voting method (Borda Count, Condorcet, or Ranked Choice). The app is serverless, deployed on AWS with a React frontend.
 
 **Live Site**: https://hamgrab.com
 
@@ -49,15 +49,25 @@ Implementation in `backend/handlers/polls.js`:
 - `checkAndIncrementDailyCounter()` - atomic DynamoDB counter increment
 - `containsInappropriateContent()` - regex-based content filter
 
-### Ranked Choice Voting Algorithm
+### Voting Methods
 
-Located in `frontend/src/rcv.ts`. Implements instant runoff voting:
-1. Count first-choice votes
-2. Eliminate candidate with fewest votes
-3. Redistribute eliminated candidate's votes to next choice
-4. Repeat until winner has >50% or only one remains
+Poll creators choose a voting method at creation time. All calculations happen client-side.
 
-**Tie-breaking**: Uses head-to-head comparisons from ballots, falls back to coin flip if still tied.
+**Available methods** (stored in `votingMethod` field):
+- **Borda Count** (`borda`) - Default. Points-based: 1st place gets N-1 points, 2nd gets N-2, etc. Best for small groups with many options.
+- **Condorcet** (`condorcet`) - Finds option that beats all others head-to-head. Falls back to Copeland score (wins - losses) if no Condorcet winner exists.
+- **Ranked Choice / IRV** (`rcv`) - Eliminates last-place each round until majority winner. Better with more voters than options.
+
+**Implementation files:**
+- `frontend/src/borda.ts` - Borda Count algorithm
+- `frontend/src/condorcet.ts` - Condorcet with Copeland fallback
+- `frontend/src/rcv.ts` - Instant runoff voting
+- `frontend/src/tiebreaker.ts` - Shared head-to-head tie-breaking logic
+- `frontend/src/voting.ts` - Unified interface and method metadata
+
+**Tie-breaking** (all methods): Uses head-to-head comparisons from ballots, falls back to deterministic coin flip if still tied.
+
+**Results page**: Users can switch between methods to compare how different algorithms would rank the same votes.
 
 ### Client-Side State Management
 

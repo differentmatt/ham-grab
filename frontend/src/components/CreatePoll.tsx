@@ -3,10 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { addPollToHistory } from '../storage';
 import { PollHistory } from './PollHistory';
+import type { VotingMethod } from '../types';
+import { VOTING_METHODS } from '../voting';
 
 export function CreatePoll() {
   const [title, setTitle] = useState('');
   const [pollType, setPollType] = useState<'movie' | 'other'>('movie');
+  const [votingMethod, setVotingMethod] = useState<VotingMethod>('borda');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [dailyPollCount, setDailyPollCount] = useState<number | null>(null);
@@ -31,7 +34,7 @@ export function CreatePoll() {
     setError('');
 
     try {
-      const result = await api.createPoll(title.trim(), pollType);
+      const result = await api.createPoll(title.trim(), pollType, votingMethod);
       addPollToHistory({
         pollId: result.pollId,
         title: result.title,
@@ -107,6 +110,33 @@ export function CreatePoll() {
                 />
                 <span className="ml-2 text">Other</span>
               </label>
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <label className="block text-sm font-medium text-muted mb-2">
+              Voting Method
+            </label>
+            <div className="space-y-3">
+              {(Object.keys(VOTING_METHODS) as VotingMethod[]).map((method) => (
+                <label key={method} className="flex items-start cursor-pointer">
+                  <input
+                    type="radio"
+                    name="votingMethod"
+                    value={method}
+                    checked={votingMethod === method}
+                    onChange={(e) => setVotingMethod(e.target.value as VotingMethod)}
+                    className="w-4 h-4 mt-0.5 text-primary bg-input border-border focus:ring-primary focus:ring-2"
+                    disabled={loading}
+                  />
+                  <div className="ml-2">
+                    <span className="text font-medium">{VOTING_METHODS[method].name}</span>
+                    <p className="text-xs text-muted mt-0.5">
+                      {VOTING_METHODS[method].description}
+                    </p>
+                  </div>
+                </label>
+              ))}
             </div>
           </div>
 
