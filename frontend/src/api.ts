@@ -26,11 +26,12 @@ export const api = {
   createPoll: (
     title: string,
     pollType: 'movie' | 'other',
-    votingMethod: VotingMethod = 'borda'
+    votingMethod: VotingMethod = 'borda',
+    groupVoting: boolean = false
   ): Promise<CreatePollResponse> =>
     request('/polls', {
       method: 'POST',
-      body: JSON.stringify({ title, pollType, votingMethod }),
+      body: JSON.stringify({ title, pollType, votingMethod, groupVoting }),
     }),
 
   getPoll: (pollId: string, adminToken?: string): Promise<Poll> => {

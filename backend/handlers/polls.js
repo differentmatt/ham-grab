@@ -81,7 +81,7 @@ const VALID_VOTING_METHODS = ['borda', 'condorcet', 'rcv'];
 export const create = async (event) => {
   try {
     const body = JSON.parse(event.body || '{}');
-    const { title, pollType, votingMethod } = body;
+    const { title, pollType, votingMethod, groupVoting } = body;
 
     if (!title?.trim()) {
       return badRequest('Title is required');
@@ -131,6 +131,7 @@ export const create = async (event) => {
       title: title.trim(),
       pollType,
       votingMethod: method,
+      groupVoting: groupVoting || false,
       phase: 'nominating',
       createdAt: Date.now(),
     };
@@ -146,6 +147,7 @@ export const create = async (event) => {
       title: poll.title,
       pollType: poll.pollType,
       votingMethod: poll.votingMethod,
+      groupVoting: poll.groupVoting,
       phase: poll.phase,
       dailyPollCount: count,
     });
@@ -196,6 +198,7 @@ export const get = async (event) => {
       title: metadata.title,
       pollType: metadata.pollType || 'movie', // Default to 'movie' for backward compatibility
       votingMethod: metadata.votingMethod || 'rcv', // Default to 'rcv' for existing polls
+      groupVoting: metadata.groupVoting || false,
       phase: metadata.phase,
       createdAt: metadata.createdAt,
       movies,

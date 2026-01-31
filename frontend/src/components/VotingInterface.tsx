@@ -1,27 +1,31 @@
 import { useState, useMemo, useEffect } from 'react';
 import { api } from '../api';
-import { getStoredName, setStoredName, getVoterKey, getVoteDraft, saveVoteDraft } from '../storage';
+import { getStoredName, setStoredName, getVoterKey, getVoteDraft, saveVoteDraft, generateFreshKey } from '../storage';
 import type { Poll } from '../types';
 
 interface VotingInterfaceProps {
   poll: Poll;
   pollId: string;
   onVoted: () => void;
+  groupMode?: boolean;
 }
 
-export function VotingInterface({ poll, pollId, onVoted }: VotingInterfaceProps) {
+export function VotingInterface({ poll, pollId, onVoted, groupMode = false }: VotingInterfaceProps) {
   const itemLabel = poll.pollType === 'movie' ? 'movies' : 'items';
   const itemLabelSingular = poll.pollType === 'movie' ? 'movie' : 'item';
 
+  // In group mode, don't load any previous state
   // Check if user has already voted (only available if poll is closed)
   const voterKey = getVoterKey();
-  const existingVote = poll.votes?.find((v) => v.voteId === voterKey);
+  const existingVote = groupMode ? undefined : poll.votes?.find((v) => v.voteId === voterKey);
 
-  // Check localStorage for draft
-  const voteDraft = getVoteDraft(pollId);
+  // Check localStorage for draft (skip in group mode)
+  const voteDraft = groupMode ? null : getVoteDraft(pollId);
 
   // Initialize rankings from draft, existing vote, or empty
   const initialRankings = useMemo(() => {
+    // In group mode, always start fresh
+    if (groupMode) return [];
     // Prefer draft (more recent) over existing vote
     const source = voteDraft || existingVote;
     if (source) {
@@ -31,7 +35,7 @@ export function VotingInterface({ poll, pollId, onVoted }: VotingInterfaceProps)
       );
     }
     return [];
-  }, [voteDraft, existingVote, poll.movies]);
+  }, [voteDraft, existingVote, poll.movies, groupMode]);
 
   const initialUnranked = useMemo(() => {
     const rankedIds = new Set(initialRankings);
@@ -40,7 +44,8 @@ export function VotingInterface({ poll, pollId, onVoted }: VotingInterfaceProps)
       .filter((id) => !rankedIds.has(id));
   }, [initialRankings, poll.movies]);
 
-  const initialNickname = voteDraft?.nickname || existingVote?.nickname || getStoredName();
+  // In group mode, start with empty name
+  const initialNickname = groupMode ? '' : (voteDraft?.nickname || existingVote?.nickname || getStoredName());
 
   const [nickname, setNickname] = useState(initialNickname);
   const [rankings, setRankings] = useState<string[]>(initialRankings);
@@ -49,12 +54,12 @@ export function VotingInterface({ poll, pollId, onVoted }: VotingInterfaceProps)
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Save draft whenever rankings or nickname changes
+  // Save draft whenever rankings or nickname changes (skip in group mode)
   useEffect(() => {
-    if (rankings.length > 0 || nickname.trim()) {
+    if (!groupMode && (rankings.length > 0 || nickname.trim())) {
       saveVoteDraft(pollId, rankings, nickname);
     }
-  }, [rankings, nickname, pollId]);
+  }, [rankings, nickname, pollId, groupMode]);
 
   const getMovie = (id: string) => poll.movies.find((m) => m.movieId === id);
 
@@ -129,8 +134,14 @@ export function VotingInterface({ poll, pollId, onVoted }: VotingInterfaceProps)
     setError('');
 
     try {
-      setStoredName(nickname.trim());
-      await api.submitVote(pollId, getVoterKey(), nickname.trim(), rankings);
+      // In group mode, don't save name to localStorage
+      if (!groupMode) {
+        setStoredName(nickname.trim());
+      }
+      // In group mode, generate a fresh unique key for each vote
+      // This allows multiple votes from the same browser
+      const oddsKey = groupMode ? generateFreshKey() : getVoterKey();
+      await api.submitVote(pollId, oddsKey, nickname.trim(), rankings);
       onVoted();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to submit vote');
@@ -142,7 +153,12 @@ export function VotingInterface({ poll, pollId, onVoted }: VotingInterfaceProps)
   return (
     <div className="space-y-6">
       {/* Name Input */}
-      <div>
+      <div className={groupMode ? 'bg-surface border border-border rounded-xl p-4' : ''}>
+        {groupMode && (
+          <p className="text-sm text font-medium mb-2">
+            Step 1: Enter your name
+          </p>
+        )}
         <label className="block text-sm font-medium text-muted mb-2">
           Your Name
         </label>
@@ -152,10 +168,18 @@ export function VotingInterface({ poll, pollId, onVoted }: VotingInterfaceProps)
           onChange={(e) => setNickname(e.target.value)}
           placeholder="Enter your name"
           className="w-full px-4 py-3 bg-input border border-border rounded-lg text placeholder-text-muted focus:outline-none focus:ring-2 focus:ring-primary"
+          autoFocus={groupMode}
         />
       </div>
 
       {/* Rankings */}
+      <div>
+        {groupMode && (
+          <p className="text-sm text font-medium mb-2">
+            Step 2: Rank the items
+          </p>
+        )}
+      </div>
       <div className="grid gap-4 lg:grid-cols-2">
         {/* Ranked List */}
         <div>
@@ -277,6 +301,11 @@ export function VotingInterface({ poll, pollId, onVoted }: VotingInterfaceProps)
       {error && <p className="text-sm text-red-400">{error}</p>}
 
       {/* Submit */}
+      {groupMode && (
+        <p className="text-sm text font-medium">
+          Step 3: Submit your vote
+        </p>
+      )}
       <button
         onClick={handleSubmit}
         disabled={!nickname.trim() || rankings.length === 0 || loading}
@@ -287,9 +316,11 @@ export function VotingInterface({ poll, pollId, onVoted }: VotingInterfaceProps)
           : `Submit Vote (${rankings.length} ${rankings.length !== 1 ? itemLabel : itemLabelSingular} ranked)`}
       </button>
 
-      <p className="text-muted text-sm text-center">
-        You can change your vote until voting closes.
-      </p>
+      {!groupMode && (
+        <p className="text-muted text-sm text-center">
+          You can change your vote until voting closes.
+        </p>
+      )}
     </div>
   );
 }

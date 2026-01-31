@@ -9,6 +9,10 @@ import { AddMovie } from './AddMovie';
 import { MovieList } from './MovieList';
 import { VotingInterface } from './VotingInterface';
 import { Results } from './Results';
+import { HandoffScreen } from './HandoffScreen';
+import { GroupVotingStart } from './GroupVotingStart';
+
+type GroupVotingState = 'ready' | 'voting' | 'handoff';
 
 export function PollPage() {
   const { pollId } = useParams<{ pollId: string }>();
@@ -19,6 +23,7 @@ export function PollPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [voted, setVoted] = useState(false);
+  const [groupVotingState, setGroupVotingState] = useState<GroupVotingState>('ready');
   const pollDataRef = useRef<string | null>(null);
 
   const fetchPoll = useCallback(async () => {
@@ -269,31 +274,65 @@ export function PollPage() {
               as many or as few {itemLabelLower} as you want.
             </p>
           </div>
-          {voted ? (
-            <div className="bg-card border border-border rounded-xl p-6 text-center">
-              <p className="text text-lg font-medium mb-2">
-                Vote Submitted!
-              </p>
-              <p className="text-muted mb-4">
-                You can change your vote until voting closes.
-              </p>
-              <button
-                onClick={() => setVoted(false)}
-                className="px-4 py-2 bg-white hover:bg-warm-200 text text-sm rounded-lg transition-colors"
-              >
-                Change My Vote
-              </button>
-            </div>
+          {poll.groupVoting ? (
+            // Group voting mode
+            groupVotingState === 'ready' ? (
+              <GroupVotingStart
+                onStart={() => setGroupVotingState('voting')}
+                voteCount={poll.voteCount}
+              />
+            ) : groupVotingState === 'handoff' ? (
+              <HandoffScreen
+                onNextVoter={() => setGroupVotingState('voting')}
+                voteCount={poll.voteCount}
+                isAdmin={poll.isAdmin}
+                onDoneVoting={poll.isAdmin && adminToken ? async () => {
+                  await api.updatePhase(pollId, 'closed', adminToken);
+                  fetchPoll();
+                } : undefined}
+              />
+            ) : (
+              <VotingInterface
+                key={`group-${poll.voteCount}`}
+                poll={poll}
+                pollId={pollId}
+                groupMode={true}
+                onVoted={() => {
+                  setGroupVotingState('handoff');
+                  fetchPoll();
+                }}
+              />
+            )
           ) : (
-            <VotingInterface
-              poll={poll}
-              pollId={pollId}
-              onVoted={() => setVoted(true)}
-            />
+            // Normal voting mode
+            voted ? (
+              <div className="bg-card border border-border rounded-xl p-6 text-center">
+                <p className="text text-lg font-medium mb-2">
+                  Vote Submitted!
+                </p>
+                <p className="text-muted mb-4">
+                  You can change your vote until voting closes.
+                </p>
+                <button
+                  onClick={() => setVoted(false)}
+                  className="px-4 py-2 bg-white hover:bg-warm-200 text text-sm rounded-lg transition-colors"
+                >
+                  Change My Vote
+                </button>
+              </div>
+            ) : (
+              <VotingInterface
+                poll={poll}
+                pollId={pollId}
+                onVoted={() => setVoted(true)}
+              />
+            )
           )}
-          <p className="mt-4 text-center text-muted">
-            {poll.voteCount} vote{poll.voteCount !== 1 ? 's' : ''} submitted
-          </p>
+          {!poll.groupVoting && (
+            <p className="mt-4 text-center text-muted">
+              {poll.voteCount} vote{poll.voteCount !== 1 ? 's' : ''} submitted
+            </p>
+          )}
         </>
       )}
 

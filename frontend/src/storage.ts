@@ -92,3 +92,8 @@ export function clearVoteDraft(pollId: string): void {
   const key = `${STORAGE_KEYS.VOTE_DRAFT}_${pollId}`;
   localStorage.removeItem(key);
 }
+
+// Generate a fresh unique key for group voting mode
+export function generateFreshKey(): string {
+  return generateKey();
+}

@@ -23,6 +23,7 @@ export interface Poll {
   title: string;
   pollType: 'movie' | 'other';
   votingMethod: VotingMethod;
+  groupVoting?: boolean;
   phase: 'nominating' | 'voting' | 'closed';
   createdAt: number;
   movies: Movie[];
@@ -38,6 +39,7 @@ export interface CreatePollResponse {
   title: string;
   pollType: 'movie' | 'other';
   votingMethod: VotingMethod;
+  groupVoting?: boolean;
   phase: string;
   dailyPollCount?: number;
 }
