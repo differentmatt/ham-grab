@@ -141,6 +141,16 @@ export function PollPage() {
     };
   }, [fetchPoll]);
 
+  // Reset per-voting-round local state whenever we leave the voting phase,
+  // so a later "Reopen Voting" or "Back to Nominations" -> voting cycle
+  // starts fresh instead of resuming a stale group-voting step.
+  useEffect(() => {
+    if (poll?.phase !== 'voting') {
+      setGroupVotingState('ready');
+      setVoted(false);
+    }
+  }, [poll?.phase]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">

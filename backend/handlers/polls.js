@@ -1,4 +1,4 @@
-import { GetCommand, PutCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { GetCommand, PutCommand, QueryCommand, UpdateCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb';
 import { nanoid } from 'nanoid';
 import { docClient, TABLE_NAME } from '../lib/dynamo.js';
 import { success, created, badRequest, notFound, forbidden, serverError } from '../lib/response.js';
@@ -273,6 +273,27 @@ export const updatePhase = async (event) => {
       return forbidden('Invalid admin token');
     }
 
+    // Returning to nominations restarts the voting round, so clear any
+    // votes cast under the old settings (e.g. shared-device mode) rather
+    // than risk mixing them with votes cast after it reopens.
+    if (phase === 'nominating' && result.Item.phase !== 'nominating') {
+      const votesResult = await docClient.send(new QueryCommand({
+        TableName: TABLE_NAME,
+        KeyConditionExpression: 'PK = :pk AND begins_with(SK, :prefix)',
+        ExpressionAttributeValues: {
+          ':pk': `POLL#${pollId}`,
+          ':prefix': 'VOTE#',
+        },
+      }));
+
+      await Promise.all((votesResult.Items || []).map((vote) =>
+        docClient.send(new DeleteCommand({
+          TableName: TABLE_NAME,
+          Key: { PK: vote.PK, SK: vote.SK },
+        }))
+      ));
+    }
+
     // Update phase
     await docClient.send(new UpdateCommand({
       TableName: TABLE_NAME,
@@ -284,6 +305,59 @@ export const updatePhase = async (event) => {
     }));
 
     return success({ phase });
+  } catch (error) {
+    return serverError(error);
+  }
+};
+
+// PUT /polls/{pollId}/settings - Update poll settings (admin only)
+export const updateSettings = async (event) => {
+  try {
+    const { pollId } = event.pathParameters || {};
+    const body = JSON.parse(event.body || '{}');
+    const { groupVoting, adminToken } = body;
+
+    if (!pollId) {
+      return badRequest('Poll ID is required');
+    }
+
+    if (typeof groupVoting !== 'boolean') {
+      return badRequest('groupVoting must be a boolean');
+    }
+
+    // Get current poll to verify admin token
+    const result = await docClient.send(new GetCommand({
+      TableName: TABLE_NAME,
+      Key: { PK: `POLL#${pollId}`, SK: 'METADATA' },
+    }));
+
+    if (!result.Item) {
+      return notFound('Poll not found');
+    }
+
+    if (result.Item.adminToken !== adminToken) {
+      return forbidden('Invalid admin token');
+    }
+
+    // Changing this once voting has opened can strand in-progress voters
+    // and muddies duplicate-vote detection, so it's only editable while
+    // nominating. To change it later, the admin must return to Nominations
+    // first (which resets the round).
+    if (result.Item.phase !== 'nominating') {
+      return badRequest('Shared device voting can only be changed during nominations');
+    }
+
+    // Update groupVoting
+    await docClient.send(new UpdateCommand({
+      TableName: TABLE_NAME,
+      Key: { PK: `POLL#${pollId}`, SK: 'METADATA' },
+      UpdateExpression: 'SET groupVoting = :groupVoting',
+      ExpressionAttributeValues: {
+        ':groupVoting': groupVoting,
+      },
+    }));
+
+    return success({ groupVoting });
   } catch (error) {
     return serverError(error);
   }

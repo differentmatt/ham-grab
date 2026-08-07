@@ -56,8 +56,8 @@ export function addPollToHistory(poll: PollHistoryItem): void {
     history.unshift({ ...poll, lastVisited: Date.now() });
   }
 
-  // Keep only last 20 polls
-  const trimmed = history.slice(0, 20);
+  // Keep only last 100 polls
+  const trimmed = history.slice(0, 100);
   localStorage.setItem(STORAGE_KEYS.POLL_HISTORY, JSON.stringify(trimmed));
 }
 

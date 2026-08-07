@@ -41,6 +41,9 @@ cat > env.json <<EOF
   "UpdatePollPhaseFunction": {
     "POLLS_TABLE": "movie-vote-polls-local"
   },
+  "UpdatePollSettingsFunction": {
+    "POLLS_TABLE": "movie-vote-polls-local"
+  },
   "AddMovieFunction": {
     "POLLS_TABLE": "movie-vote-polls-local",
     "ANTHROPIC_API_KEY": "${ANTHROPIC_API_KEY:-}"

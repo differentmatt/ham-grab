@@ -49,6 +49,16 @@ export const api = {
       body: JSON.stringify({ phase, adminToken }),
     }),
 
+  updateGroupVoting: (
+    pollId: string,
+    groupVoting: boolean,
+    adminToken: string
+  ): Promise<{ groupVoting: boolean }> =>
+    request(`/polls/${pollId}/settings`, {
+      method: 'PUT',
+      body: JSON.stringify({ groupVoting, adminToken }),
+    }),
+
   addMovie: (
     pollId: string,
     title: string,
