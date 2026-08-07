@@ -17,7 +17,7 @@ export function AddMovie({ pollId, pollType, movieCount, onAdded }: AddMovieProp
 
   const itemLabel = pollType === 'movie' ? 'Movie' : 'Item';
   const itemPlaceholder = pollType === 'movie' ? 'Movie title' : 'Item name';
-  const limitReached = movieCount >= 20;
+  const limitReached = movieCount >= 100;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -47,7 +47,7 @@ export function AddMovie({ pollId, pollType, movieCount, onAdded }: AddMovieProp
 
       {limitReached ? (
         <div className="text-sm text-muted">
-          Maximum limit of 20 entries reached. No more {itemLabel.toLowerCase()}s can be added.
+          Maximum limit of 100 entries reached. No more {itemLabel.toLowerCase()}s can be added.
         </div>
       ) : (
         <>
