@@ -273,28 +273,11 @@ export const updatePhase = async (event) => {
       return forbidden('Invalid admin token');
     }
 
-    // Returning to nominations restarts the voting round, so clear any
-    // votes cast under the old settings (e.g. shared-device mode) rather
-    // than risk mixing them with votes cast after it reopens.
-    if (phase === 'nominating' && result.Item.phase !== 'nominating') {
-      const votesResult = await docClient.send(new QueryCommand({
-        TableName: TABLE_NAME,
-        KeyConditionExpression: 'PK = :pk AND begins_with(SK, :prefix)',
-        ExpressionAttributeValues: {
-          ':pk': `POLL#${pollId}`,
-          ':prefix': 'VOTE#',
-        },
-      }));
+    const returningToNominations = phase === 'nominating' && result.Item.phase !== 'nominating';
 
-      await Promise.all((votesResult.Items || []).map((vote) =>
-        docClient.send(new DeleteCommand({
-          TableName: TABLE_NAME,
-          Key: { PK: vote.PK, SK: vote.SK },
-        }))
-      ));
-    }
-
-    // Update phase
+    // Flip the phase before clearing votes, so submitVote's phase check
+    // (which requires 'voting') starts rejecting new votes immediately
+    // instead of leaving a window where votes are accepted mid-reset.
     await docClient.send(new UpdateCommand({
       TableName: TABLE_NAME,
       Key: { PK: `POLL#${pollId}`, SK: 'METADATA' },
@@ -303,6 +286,35 @@ export const updatePhase = async (event) => {
         ':phase': phase,
       },
     }));
+
+    // Returning to nominations restarts the voting round, so clear any
+    // votes cast under the old settings (e.g. shared-device mode) rather
+    // than risk mixing them with votes cast after it reopens. Paginate
+    // since a single Query page caps out around 1MB, and delete
+    // sequentially to avoid firing an unbounded burst of writes.
+    if (returningToNominations) {
+      let lastEvaluatedKey;
+      do {
+        const votesResult = await docClient.send(new QueryCommand({
+          TableName: TABLE_NAME,
+          KeyConditionExpression: 'PK = :pk AND begins_with(SK, :prefix)',
+          ExpressionAttributeValues: {
+            ':pk': `POLL#${pollId}`,
+            ':prefix': 'VOTE#',
+          },
+          ExclusiveStartKey: lastEvaluatedKey,
+        }));
+
+        for (const vote of votesResult.Items || []) {
+          await docClient.send(new DeleteCommand({
+            TableName: TABLE_NAME,
+            Key: { PK: vote.PK, SK: vote.SK },
+          }));
+        }
+
+        lastEvaluatedKey = votesResult.LastEvaluatedKey;
+      } while (lastEvaluatedKey);
+    }
 
     return success({ phase });
   } catch (error) {
