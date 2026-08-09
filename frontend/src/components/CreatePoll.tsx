@@ -10,7 +10,6 @@ export function CreatePoll() {
   const [title, setTitle] = useState('');
   const [pollType, setPollType] = useState<'movie' | 'other'>('movie');
   const [votingMethod, setVotingMethod] = useState<VotingMethod>('borda');
-  const [groupVoting, setGroupVoting] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
@@ -23,7 +22,7 @@ export function CreatePoll() {
     setError('');
 
     try {
-      const result = await api.createPoll(title.trim(), pollType, votingMethod, groupVoting);
+      const result = await api.createPoll(title.trim(), pollType, votingMethod);
       addPollToHistory({
         pollId: result.pollId,
         title: result.title,
@@ -127,24 +126,6 @@ export function CreatePoll() {
                 </label>
               ))}
             </div>
-          </div>
-
-          <div className="mt-4 pt-4 border-t border-border">
-            <label className="flex items-start cursor-pointer">
-              <input
-                type="checkbox"
-                checked={groupVoting}
-                onChange={(e) => setGroupVoting(e.target.checked)}
-                className="w-4 h-4 mt-0.5 text-primary bg-input border-border rounded focus:ring-primary focus:ring-2"
-                disabled={loading}
-              />
-              <div className="ml-2">
-                <span className="text font-medium">Shared device voting</span>
-                <p className="text-xs text-muted mt-0.5">
-                  Allow multiple people to vote from the same device, taking turns
-                </p>
-              </div>
-            </label>
           </div>
 
           {error && (

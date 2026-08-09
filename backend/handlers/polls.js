@@ -1,9 +1,52 @@
-import { GetCommand, PutCommand, QueryCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
+import { GetCommand, PutCommand, QueryCommand, UpdateCommand, BatchWriteCommand } from '@aws-sdk/lib-dynamodb';
+import { ConditionalCheckFailedException } from '@aws-sdk/client-dynamodb';
 import { nanoid } from 'nanoid';
 import { docClient, TABLE_NAME } from '../lib/dynamo.js';
 import { success, created, badRequest, notFound, forbidden, serverError } from '../lib/response.js';
 
 const DAILY_POLL_LIMIT = 50;
+const BATCH_WRITE_LIMIT = 25;
+
+const chunk = (items, size) => {
+  const chunks = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+};
+
+// Deletes every VOTE# item under a poll. Paginates the query (a single page
+// caps out around 1MB) and batches the deletes (25 per request, retrying
+// any UnprocessedItems) so a poll with many votes can't time out the
+// Lambda mid-reset and leave stale votes behind.
+const deleteAllVotes = async (pollId) => {
+  let lastEvaluatedKey;
+  do {
+    const votesResult = await docClient.send(new QueryCommand({
+      TableName: TABLE_NAME,
+      KeyConditionExpression: 'PK = :pk AND begins_with(SK, :prefix)',
+      ExpressionAttributeValues: {
+        ':pk': `POLL#${pollId}`,
+        ':prefix': 'VOTE#',
+      },
+      ProjectionExpression: 'PK, SK',
+      ExclusiveStartKey: lastEvaluatedKey,
+    }));
+
+    for (const keys of chunk(votesResult.Items || [], BATCH_WRITE_LIMIT)) {
+      let requestItems = {
+        [TABLE_NAME]: keys.map((key) => ({ DeleteRequest: { Key: key } })),
+      };
+
+      while (requestItems[TABLE_NAME]?.length) {
+        const batchResult = await docClient.send(new BatchWriteCommand({ RequestItems: requestItems }));
+        requestItems = batchResult.UnprocessedItems || {};
+      }
+    }
+
+    lastEvaluatedKey = votesResult.LastEvaluatedKey;
+  } while (lastEvaluatedKey);
+};
 
 // Helper to get today's date in YYYY-MM-DD format
 const getTodayDateKey = () => {
@@ -273,7 +316,11 @@ export const updatePhase = async (event) => {
       return forbidden('Invalid admin token');
     }
 
-    // Update phase
+    const returningToNominations = phase === 'nominating' && result.Item.phase !== 'nominating';
+
+    // Flip the phase before clearing votes, so submitVote's phase check
+    // (which requires 'voting') starts rejecting new votes immediately
+    // instead of leaving a window where votes are accepted mid-reset.
     await docClient.send(new UpdateCommand({
       TableName: TABLE_NAME,
       Key: { PK: `POLL#${pollId}`, SK: 'METADATA' },
@@ -283,7 +330,79 @@ export const updatePhase = async (event) => {
       },
     }));
 
+    // Returning to nominations restarts the voting round, so clear any
+    // votes cast under the old settings (e.g. shared-device mode) rather
+    // than risk mixing them with votes cast after it reopens.
+    if (returningToNominations) {
+      await deleteAllVotes(pollId);
+    }
+
     return success({ phase });
+  } catch (error) {
+    return serverError(error);
+  }
+};
+
+// PUT /polls/{pollId}/settings - Update poll settings (admin only)
+export const updateSettings = async (event) => {
+  try {
+    const { pollId } = event.pathParameters || {};
+    const body = JSON.parse(event.body || '{}');
+    const { groupVoting, adminToken } = body;
+
+    if (!pollId) {
+      return badRequest('Poll ID is required');
+    }
+
+    if (typeof groupVoting !== 'boolean') {
+      return badRequest('groupVoting must be a boolean');
+    }
+
+    // Get current poll to verify admin token
+    const result = await docClient.send(new GetCommand({
+      TableName: TABLE_NAME,
+      Key: { PK: `POLL#${pollId}`, SK: 'METADATA' },
+    }));
+
+    if (!result.Item) {
+      return notFound('Poll not found');
+    }
+
+    if (result.Item.adminToken !== adminToken) {
+      return forbidden('Invalid admin token');
+    }
+
+    // Changing this once voting has opened can strand in-progress voters
+    // and muddies duplicate-vote detection, so it's only editable while
+    // nominating. To change it later, the admin must return to Nominations
+    // first (which resets the round).
+    if (result.Item.phase !== 'nominating') {
+      return badRequest('Shared device voting can only be changed during nominations');
+    }
+
+    // Re-check the phase atomically with the write: the phase could have
+    // moved on between the read above and this update (e.g. the admin
+    // opened voting from another tab), and this condition stops that
+    // request from updating groupVoting after voting has started.
+    try {
+      await docClient.send(new UpdateCommand({
+        TableName: TABLE_NAME,
+        Key: { PK: `POLL#${pollId}`, SK: 'METADATA' },
+        UpdateExpression: 'SET groupVoting = :groupVoting',
+        ConditionExpression: 'phase = :expectedPhase',
+        ExpressionAttributeValues: {
+          ':groupVoting': groupVoting,
+          ':expectedPhase': 'nominating',
+        },
+      }));
+    } catch (error) {
+      if (error instanceof ConditionalCheckFailedException) {
+        return badRequest('Shared device voting can only be changed during nominations');
+      }
+      throw error;
+    }
+
+    return success({ groupVoting });
   } catch (error) {
     return serverError(error);
   }

@@ -5,7 +5,7 @@ Description: Movie Night Vote - Ranked Choice Voting
 Globals:
   Function:
     Timeout: 10
-    Runtime: nodejs18.x
+    Runtime: nodejs22.x
     MemorySize: 256
     Environment:
       Variables:
@@ -237,6 +237,22 @@ Resources:
           Properties:
             RestApiId: !Ref ApiGateway
             Path: /polls/{pollId}/phase
+            Method: PUT
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref PollsTable
+
+  UpdatePollSettingsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: backend/
+      Handler: handlers/polls.updateSettings
+      Events:
+        Api:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /polls/{pollId}/settings
             Method: PUT
       Policies:
         - DynamoDBCrudPolicy:
