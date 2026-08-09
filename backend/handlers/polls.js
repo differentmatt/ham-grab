@@ -1,9 +1,52 @@
-import { GetCommand, PutCommand, QueryCommand, UpdateCommand, DeleteCommand } from '@aws-sdk/lib-dynamodb';
+import { GetCommand, PutCommand, QueryCommand, UpdateCommand, BatchWriteCommand } from '@aws-sdk/lib-dynamodb';
+import { ConditionalCheckFailedException } from '@aws-sdk/client-dynamodb';
 import { nanoid } from 'nanoid';
 import { docClient, TABLE_NAME } from '../lib/dynamo.js';
 import { success, created, badRequest, notFound, forbidden, serverError } from '../lib/response.js';
 
 const DAILY_POLL_LIMIT = 50;
+const BATCH_WRITE_LIMIT = 25;
+
+const chunk = (items, size) => {
+  const chunks = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+};
+
+// Deletes every VOTE# item under a poll. Paginates the query (a single page
+// caps out around 1MB) and batches the deletes (25 per request, retrying
+// any UnprocessedItems) so a poll with many votes can't time out the
+// Lambda mid-reset and leave stale votes behind.
+const deleteAllVotes = async (pollId) => {
+  let lastEvaluatedKey;
+  do {
+    const votesResult = await docClient.send(new QueryCommand({
+      TableName: TABLE_NAME,
+      KeyConditionExpression: 'PK = :pk AND begins_with(SK, :prefix)',
+      ExpressionAttributeValues: {
+        ':pk': `POLL#${pollId}`,
+        ':prefix': 'VOTE#',
+      },
+      ProjectionExpression: 'PK, SK',
+      ExclusiveStartKey: lastEvaluatedKey,
+    }));
+
+    for (const keys of chunk(votesResult.Items || [], BATCH_WRITE_LIMIT)) {
+      let requestItems = {
+        [TABLE_NAME]: keys.map((key) => ({ DeleteRequest: { Key: key } })),
+      };
+
+      while (requestItems[TABLE_NAME]?.length) {
+        const batchResult = await docClient.send(new BatchWriteCommand({ RequestItems: requestItems }));
+        requestItems = batchResult.UnprocessedItems || {};
+      }
+    }
+
+    lastEvaluatedKey = votesResult.LastEvaluatedKey;
+  } while (lastEvaluatedKey);
+};
 
 // Helper to get today's date in YYYY-MM-DD format
 const getTodayDateKey = () => {
@@ -289,31 +332,9 @@ export const updatePhase = async (event) => {
 
     // Returning to nominations restarts the voting round, so clear any
     // votes cast under the old settings (e.g. shared-device mode) rather
-    // than risk mixing them with votes cast after it reopens. Paginate
-    // since a single Query page caps out around 1MB, and delete
-    // sequentially to avoid firing an unbounded burst of writes.
+    // than risk mixing them with votes cast after it reopens.
     if (returningToNominations) {
-      let lastEvaluatedKey;
-      do {
-        const votesResult = await docClient.send(new QueryCommand({
-          TableName: TABLE_NAME,
-          KeyConditionExpression: 'PK = :pk AND begins_with(SK, :prefix)',
-          ExpressionAttributeValues: {
-            ':pk': `POLL#${pollId}`,
-            ':prefix': 'VOTE#',
-          },
-          ExclusiveStartKey: lastEvaluatedKey,
-        }));
-
-        for (const vote of votesResult.Items || []) {
-          await docClient.send(new DeleteCommand({
-            TableName: TABLE_NAME,
-            Key: { PK: vote.PK, SK: vote.SK },
-          }));
-        }
-
-        lastEvaluatedKey = votesResult.LastEvaluatedKey;
-      } while (lastEvaluatedKey);
+      await deleteAllVotes(pollId);
     }
 
     return success({ phase });
@@ -359,15 +380,27 @@ export const updateSettings = async (event) => {
       return badRequest('Shared device voting can only be changed during nominations');
     }
 
-    // Update groupVoting
-    await docClient.send(new UpdateCommand({
-      TableName: TABLE_NAME,
-      Key: { PK: `POLL#${pollId}`, SK: 'METADATA' },
-      UpdateExpression: 'SET groupVoting = :groupVoting',
-      ExpressionAttributeValues: {
-        ':groupVoting': groupVoting,
-      },
-    }));
+    // Re-check the phase atomically with the write: the phase could have
+    // moved on between the read above and this update (e.g. the admin
+    // opened voting from another tab), and this condition stops that
+    // request from updating groupVoting after voting has started.
+    try {
+      await docClient.send(new UpdateCommand({
+        TableName: TABLE_NAME,
+        Key: { PK: `POLL#${pollId}`, SK: 'METADATA' },
+        UpdateExpression: 'SET groupVoting = :groupVoting',
+        ConditionExpression: 'phase = :expectedPhase',
+        ExpressionAttributeValues: {
+          ':groupVoting': groupVoting,
+          ':expectedPhase': 'nominating',
+        },
+      }));
+    } catch (error) {
+      if (error instanceof ConditionalCheckFailedException) {
+        return badRequest('Shared device voting can only be changed during nominations');
+      }
+      throw error;
+    }
 
     return success({ groupVoting });
   } catch (error) {
