@@ -104,6 +104,8 @@ export const add = async (event) => {
         ':pk': `POLL#${pollId}`,
         ':sk': 'MOVIE#',
       },
+      ProjectionExpression: '#t',
+      ExpressionAttributeNames: { '#t': 'title' },
     }));
 
     const normalizedTitle = title.trim().toLowerCase();
